@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <wait.h>
 void process(char* cmd, int n)
 {
     if(!n)return ;
@@ -41,12 +42,28 @@ void process(char* cmd, int n)
     }
     else str[m][len++] = 0;
     m++;
-    for(int i = 0; i < m; i++)
+    str = realloc(str, m * sizeof(char*));
+    str[m] = NULL;
+    int pid;
+    if((pid = fork()) == 0)
     {
-        printf("%s\n",str[i]);
-        free(str[i]);
+        if(execvp(str[0], str) < 0)
+        {
+            printf("%s: Command not found.\n", str[0]);
+            exit(-1);
+        }
+
     }
-    free(str);
+    int status, retpid;
+    if((retpid = waitpid(-1, &status, 0)) < 0)
+    {
+        if(retpid == pid)
+        {
+            for(int i = 0; i < m; i++)
+            free(str[i]);
+            free(str);
+        }
+    }
 }
 int main()
 {
