@@ -3,9 +3,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <wait.h>
-void process(char* cmd, int n)
+char *pwd = NULL;
+char **parse(char *cmd, int n, int *argc)
 {
-    if(!n)return ;
     char **str = malloc(sizeof(char*));
     str[0] = malloc(1);
     int m = 0, len = 0, bufsize = 1;
@@ -44,32 +44,84 @@ void process(char* cmd, int n)
     m++;
     str = realloc(str, m * sizeof(char*));
     str[m] = NULL;
-    int pid;
-    if((pid = fork()) == 0)
+    *argc = m;
+    return str;
+}
+void process(char* cmd, int n)
+{
+    if(!n)return ;
+    int m;
+    char **str = parse(cmd, n, &m);
+    if(strcmp(str[0], "quit") == 0)
     {
-        if(execvp(str[0], str) < 0)
-        {
-            printf("%s: Command not found.\n", str[0]);
-            exit(-1);
-        }
-
-    }
-    int status, retpid;
-    if((retpid = waitpid(-1, &status, 0)) < 0)
-    {
-        if(retpid == pid)
-        {
-            for(int i = 0; i < m; i++)
+        for(int i = 0; i < m; i++)
             free(str[i]);
-            free(str);
+        free(str);
+        if(m == 1)
+        {
+            free(cmd);
+            free(pwd);
+            exit(0);
+        }
+        else
+        {
+            printf("quit: Command not found.\n");
+            return ;
         }
     }
+    else if(strcmp(str[0], "cd") == 0)
+    {
+        if(m == 1)
+        {
+            free(str[0]);
+            free(str);
+            return ;
+        }
+        if(m > 2) printf("cd: Too many arguments.\n");
+        else chdir(str[1]);
+        for(int i = 0; i < m; i++)
+            free(str[i]);
+        free(str);
+        return ;
+    }
+    else if(strcmp(str[0], "pwd") == 0)
+    {
+        for(int i = 0; i < m; i++)
+            free(str[i]);
+        free(str);
+        printf("%s\n", pwd);
+        return ;
+    }
+    else
+    {
+        int pid;
+        if((pid = fork()) == 0)
+        {
+            if(execvp(str[0], str) < 0)
+            {
+                printf("%s: Command not found.\n", str[0]);
+                exit(-1);
+            }
+        }
+        int status, retpid;
+        if((retpid = waitpid(-1, &status, 0)) < 0)
+        {
+            if(retpid == pid)
+            {
+                for(int i = 0; i < m; i++)
+                    free(str[i]);
+                free(str);
+            }
+        }
+    }
+    
 }
 int main()
 {
     while(1)
     {
-        printf("NutShell>");
+        pwd = getcwd(NULL, 0);
+        printf("%s>", pwd);
         char* cmd = malloc(sizeof(char));
         int cnt = 0, n = 1;
         while(1)
@@ -97,12 +149,7 @@ int main()
             }
         }
         while(cmd[cnt - 1] == ' ')cmd[--cnt] = 0;
-        if(strcmp(cmd, "quit") == 0)
-        {
-            free(cmd);
-            return 0;
-        }
-        else if(cnt) process(cmd, cnt);
+        if(cnt) process(cmd, cnt);
         free(cmd);
     }
 }
